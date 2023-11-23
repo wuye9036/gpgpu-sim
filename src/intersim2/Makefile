@@ -51,6 +51,9 @@ CPPFLAGS += -fPIC
 CPPFLAGS += -I$(CUDA_INSTALL_PATH)/include
 LFLAGS +=
 
+include ../../gcc_opts.mk
+
+CPPFLAGS += $(GPSIM_GCC_FLAGS)
 
 ifeq ($(SIM_OBJ_FILES_DIR),)
 OBJDIR := obj

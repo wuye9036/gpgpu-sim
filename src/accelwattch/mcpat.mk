@@ -36,6 +36,9 @@ endif
 #CXXFLAGS = -Wall -Wno-unknown-pragmas -Winline $(DBG) $(OPT) 
 CXXFLAGS = -Wno-unknown-pragmas $(DBG) $(OPT) 
 
+include ../../gcc_opts.mk
+CXXFLAGS += $(GPSIM_GCC_FLAGS)
+
 
 
 

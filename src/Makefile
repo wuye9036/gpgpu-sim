@@ -33,9 +33,11 @@ DEBUG?=0
 TRACE?=1
 
 include ../version_detection.mk
+include ../gcc_opts.mk
 
 CXXFLAGS = -Wall -DDEBUG
 CXXFLAGS += -DCUDART_VERSION=$(CUDART_VERSION)
+CXXFLAGS += $(GPSIM_GCC_FLAGS)
 
 ifeq ($(GNUC_CPP0X), 1)
     CXXFLAGS += -std=c++0x

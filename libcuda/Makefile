@@ -70,6 +70,8 @@ ifeq ($(GNUC_CPP0X), 1)
     CXXFLAGS = -std=c++0x
 endif
 
+include ../gcc_opts.mk
+CXXFLAGS += $(GPSIM_GCC_FLAGS)
 
 CPP = g++ $(SNOW)
 CC = gcc $(SNOW)

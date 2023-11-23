@@ -53,6 +53,8 @@ else
 	CXXFLAGS += 
 endif
 
+include ../../gcc_opts.mk
+CXXFLAGS += $(GPSIM_GCC_FLAGS)
 CXXFLAGS += -I$(CUDA_INSTALL_PATH)/include
 
 POWER_FLAGS=
