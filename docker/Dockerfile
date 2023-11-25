@@ -21,7 +21,7 @@ RUN set -xue \
 # Install ZSH
 RUN set -xue \
     && apt-get update -y \
-    && apt-get install -y zsh sudo openssh-client gdb bear clangd
+    && apt-get install -y zsh sudo openssh-client gdb
 
 # Cleanup
 RUN rm -rf /var/lib/apt/lists/*
