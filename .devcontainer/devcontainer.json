@@ -1,0 +1,24 @@
+{
+    "image": "docker.io/wuye9036/gpgpu-sim:py3.10-gcc11-cuda11.8-ubuntu22.04",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools-extension-pack",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cmake-tools-helper",
+                "ms-vscode.makefile-tools",
+                "fabiospampinato.vscode-diff",
+                "GitHub.copilot",
+                "GitHub.copilot-chat",
+                "eamodio.gitlens",
+                "ms-vscode.hexeditor",
+                "yzhang.markdown-all-in-one",
+                "shd101wyy.markdown-preview-enhanced",
+                "gera2ld.markmap-vscode",
+                "ms-python.vscode-pylance",
+                "ms-python.python",
+                "mechatroner.rainbow-csv"
+            ]
+        }
+    }
+}
