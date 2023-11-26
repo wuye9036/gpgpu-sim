@@ -1,5 +1,6 @@
 {
     "image": "docker.io/wuye9036/gpgpu-sim:py3.10-gcc11-cuda11.8-ubuntu22.04",
+
     "customizations": {
         "vscode": {
             "extensions": [
@@ -17,7 +18,8 @@
                 "gera2ld.markmap-vscode",
                 "ms-python.vscode-pylance",
                 "ms-python.python",
-                "mechatroner.rainbow-csv"
+                "mechatroner.rainbow-csv",
+                "llvm-vs-code-extensions.vscode-clangd"
             ]
         }
     }
