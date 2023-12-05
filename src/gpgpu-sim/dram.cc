@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2021, Tor M. Aamodt, Wilson W.L. Fung, Ali Bakhoda,
-// Ivan Sham, George L. Yuan, Vijay Kandiah, Nikos Hardavellas
-// The University of British Columbia, Northwestern University
+// Ivan Sham, George L. Yuan, Vijay Kandiah, Nikos Hardavellas, 
+// Mahmoud Khairy, Junrui Pan, Timothy G. Rogers
+// The University of British Columbia, Northwestern University, Purdue University
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -879,4 +880,5 @@ unsigned dram_t::get_bankgrp_number(unsigned i) {
   } else {
     assert(1);
   }
+  return 0; // we should never get here
 }

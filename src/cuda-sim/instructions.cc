@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2021, Tor M. Aamodt, Wilson W.L. Fung, Ali Bakhoda,
-// Jimmy Kwa, George L. Yuan, Vijay Kandiah, Nikos Hardavellas
-// The University of British Columbia, Northwestern University
+// Jimmy Kwa, George L. Yuan, Vijay Kandiah, Nikos Hardavellas,
+// Mahmoud Khairy, Junrui Pan, Timothy G. Rogers
+// The University of British Columbia, Northwestern University, Purdue University
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -1947,7 +1948,7 @@ void mma_impl(const ptx_instruction *pI, core_t *core, warp_inst_t inst) {
             hex_val = (v[k / 2].s64 & 0xffff);
           else
             hex_val = ((v[k / 2].s64 & 0xffff0000) >> 16);
-          nw_v[k].f16 = *((half *)&hex_val);
+          nw_v[k].f16 = *(reinterpret_cast<half*>(hex_val));
         }
       }
       if (!((operand_num == 3) && (type2 == F32_TYPE))) {

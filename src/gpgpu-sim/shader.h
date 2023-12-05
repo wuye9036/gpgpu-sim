@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2021, Tor M. Aamodt, Wilson W.L. Fung, Andrew Turner,
-// Ali Bakhoda, Vijay Kandiah, Nikos Hardavellas
-// The University of British Columbia, Northwestern University
+// Ali Bakhoda, Vijay Kandiah, Nikos Hardavellas, 
+// Mahmoud Khairy, Junrui Pan, Timothy G. Rogers
+// The University of British Columbia, Northwestern University, Purdue University
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -122,6 +123,20 @@ class shd_warp_t {
     // Jin: cdp support
     m_cdp_latency = 0;
     m_cdp_dummy = false;
+
+    // Ni: Initialize ldgdepbar_id
+    m_ldgdepbar_id = 0;
+    m_depbar_start_id = 0;
+    m_depbar_group = 0;
+
+    // Ni: Set waiting to false
+    m_waiting_ldgsts = false;
+
+    // Ni: Clear m_ldgdepbar_buf
+    for (int i = 0; i < m_ldgdepbar_buf.size(); i++) {
+      m_ldgdepbar_buf[i].clear();
+    }
+    m_ldgdepbar_buf.clear();
   }
   void init(address_type start_pc, unsigned cta_id, unsigned wid,
             const std::bitset<MAX_WARP_SIZE> &active,
@@ -139,6 +154,20 @@ class shd_warp_t {
     // Jin: cdp support
     m_cdp_latency = 0;
     m_cdp_dummy = false;
+
+    // Ni: Initialize ldgdepbar_id
+    m_ldgdepbar_id = 0;
+    m_depbar_start_id = 0;
+    m_depbar_group = 0;
+
+    // Ni: Set waiting to false
+    m_waiting_ldgsts = false;
+
+    // Ni: Clear m_ldgdepbar_buf
+    for (int i = 0; i < m_ldgdepbar_buf.size(); i++) {
+      m_ldgdepbar_buf[i].clear();
+    }
+    m_ldgdepbar_buf.clear();
   }
 
   bool functional_done() const;
@@ -170,6 +199,7 @@ class shd_warp_t {
   void clear_membar() { m_membar = false; }
   bool get_membar() const { return m_membar; }
   virtual address_type get_pc() const { return m_next_pc; }
+  virtual kernel_info_t* get_kernel_info() const;
   void set_next_pc(address_type pc) { m_next_pc = pc; }
 
   void store_info_of_last_inst_at_barrier(const warp_inst_t *pI) {
@@ -286,6 +316,14 @@ class shd_warp_t {
  public:
   unsigned int m_cdp_latency;
   bool m_cdp_dummy;
+
+  // Ni: LDGDEPBAR barrier support
+  public:
+    unsigned int m_ldgdepbar_id;  // LDGDEPBAR barrier ID
+    std::vector<std::vector<warp_inst_t>> m_ldgdepbar_buf;  // LDGDEPBAR barrier buffer
+    unsigned int m_depbar_start_id;
+    unsigned int m_depbar_group;
+    bool m_waiting_ldgsts; // Ni: Whether the warp is waiting for the LDGSTS instrs to finish
 };
 
 inline unsigned hw_tid_from_wid(unsigned wid, unsigned warp_size, unsigned i) {
@@ -349,8 +387,8 @@ class scheduler_unit {  // this can be copied freely, so can be used in std
         m_sfu_out(sfu_out),
         m_int_out(int_out),
         m_tensor_core_out(tensor_core_out),
-        m_spec_cores_out(spec_cores_out),
         m_mem_out(mem_out),
+        m_spec_cores_out(spec_cores_out),
         m_id(id) {}
   virtual ~scheduler_unit() {}
   virtual void add_supervised_warp_id(int i) {
@@ -954,41 +992,19 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     void init(bool sub_core_model, unsigned num_warp_scheds) {
       m_sub_core_model = sub_core_model;
       m_num_warp_scheds = num_warp_scheds;
-      if (m_sub_core_model) {
-        m_last_cu_set = new unsigned(m_num_warp_scheds);
-        for (unsigned i = 0; i < m_num_warp_scheds; i++)
-        {
-          m_last_cu_set[i] = i * m_num_collectors / m_num_warp_scheds;
-        }
-      }
-      
     }
 
     collector_unit_t *find_ready() {
-      if (m_sub_core_model) {
-        assert(m_num_collectors % m_num_warp_scheds == 0 &&
-                 m_num_collectors >= m_num_warp_scheds);
-        unsigned cusPerSched = m_num_collectors / m_num_warp_scheds;
-        for (unsigned i = 0; i < m_num_warp_scheds; i++) {
-          unsigned cuLowerBound = i * cusPerSched;
-          unsigned cuUpperBound = cuLowerBound + cusPerSched;
-          assert(0 <= cuLowerBound && cuUpperBound <= m_num_collectors);
-          assert(cuLowerBound <= m_last_cu_set[i] && m_last_cu_set[i] <= cuUpperBound);
-          for (unsigned j = cuLowerBound; j < cuUpperBound; j++) {
-            unsigned c = cuLowerBound + (m_last_cu_set[i] + j + 1) % cusPerSched;
-            if ((*m_collector_units)[c].ready()) {
-            m_last_cu_set[i] = c;
-            return &((*m_collector_units)[c]);
-            }
-          }
-        }
-      } else {
-        for (unsigned n = 0; n < m_num_collectors; n++) {
-          unsigned c = (m_last_cu + n + 1) % m_num_collectors;
-          if ((*m_collector_units)[c].ready()) {
-            m_last_cu = c;
-            return &((*m_collector_units)[c]);
-          }
+      // With sub-core enabled round robin starts with the next cu assigned to a
+      // different sub-core than the one that dispatched last
+      unsigned cusPerSched = m_num_collectors / m_num_warp_scheds;
+      unsigned rr_increment = m_sub_core_model ?
+                              cusPerSched - (m_last_cu % cusPerSched) : 1;
+      for (unsigned n = 0; n < m_num_collectors; n++) {
+        unsigned c = (m_last_cu + n + rr_increment) % m_num_collectors;
+        if ((*m_collector_units)[c].ready()) {
+          m_last_cu = c;
+          return &((*m_collector_units)[c]);
         }
       }
       return NULL;
@@ -998,9 +1014,7 @@ class opndcoll_rfu_t {  // operand collector based register file unit
     unsigned m_num_collectors;
     std::vector<collector_unit_t> *m_collector_units;
     unsigned m_last_cu;  // dispatch ready cu's rr
-    unsigned *m_last_cu_set;
     unsigned m_next_cu;  // for initialization
-
     bool m_sub_core_model;
     unsigned m_num_warp_scheds;
   };
@@ -1306,7 +1320,7 @@ class sp_unit : public pipelined_simd_unit {
 class specialized_unit : public pipelined_simd_unit {
  public:
   specialized_unit(register_set *result_port, const shader_core_config *config,
-                   shader_core_ctx *core, unsigned supported_op,
+                   shader_core_ctx *core, int supported_op,
                    char *unit_name, unsigned latency, unsigned issue_reg_id);
   virtual bool can_issue(const warp_inst_t &inst) const {
     if (inst.op != m_supported_op) {
@@ -1319,7 +1333,7 @@ class specialized_unit : public pipelined_simd_unit {
   bool is_issue_partitioned() { return true; }
 
  private:
-  unsigned m_supported_op;
+  int m_supported_op;
 };
 
 class simt_core_cluster;
@@ -1336,6 +1350,15 @@ class ldst_unit : public pipelined_simd_unit {
             const memory_config *mem_config, class shader_core_stats *stats,
             unsigned sid, unsigned tpc);
 
+  // Add a structure to record the LDGSTS instructions,
+  // similar to m_pending_writes, but since LDGSTS does not have a output register
+  // to write to, so a new structure needs to be added
+  /* A multi-level map: unsigned (warp_id) -> unsigned (pc) -> unsigned (addr) -> unsigned (count)
+   */
+  std::map<unsigned /*warp_id*/,
+           std::map<unsigned /*pc*/, 
+                  std::map<unsigned /*addr*/, unsigned /*count*/>>>
+      m_pending_ldgsts;
   // modifiers
   virtual void issue(register_set &inst);
   bool is_issue_partitioned() { return false; }
@@ -1644,13 +1667,13 @@ class shader_core_config : public core_config {
   unsigned int gpgpu_operand_collector_num_out_ports_gen;
   unsigned int gpgpu_operand_collector_num_out_ports_int;
 
-  int gpgpu_num_sp_units;
-  int gpgpu_tensor_core_avail;
-  int gpgpu_num_dp_units;
-  int gpgpu_num_sfu_units;
-  int gpgpu_num_tensor_core_units;
-  int gpgpu_num_mem_units;
-  int gpgpu_num_int_units;
+  unsigned int gpgpu_num_sp_units;
+  unsigned int gpgpu_tensor_core_avail;
+  unsigned int gpgpu_num_dp_units;
+  unsigned int gpgpu_num_sfu_units;
+  unsigned int gpgpu_num_tensor_core_units;
+  unsigned int gpgpu_num_mem_units;
+  unsigned int gpgpu_num_int_units;
 
   // Shader core resources
   unsigned gpgpu_shader_registers;
@@ -1757,7 +1780,7 @@ struct shader_core_stats_pod {
   unsigned gpgpu_n_const_insn;
   unsigned gpgpu_n_param_insn;
   unsigned gpgpu_n_shmem_bkconflict;
-  unsigned gpgpu_n_cache_bkconflict;
+  unsigned gpgpu_n_l1cache_bkconflict;
   int gpgpu_n_intrawarp_mshr_merge;
   unsigned gpgpu_n_cmem_portconflict;
   unsigned gpu_stall_shd_mem_breakdown[N_MEM_STAGE_ACCESS_TYPE]
@@ -2090,6 +2113,9 @@ class shader_core_ctx : public core_t {
   // used by functional simulation:
   // modifiers
   virtual void warp_exit(unsigned warp_id);
+
+  // Ni: Unset ldgdepbar
+  void unset_depbar(const warp_inst_t &inst);
 
   // accessors
   virtual bool warp_waiting_at_barrier(unsigned warp_id) const;

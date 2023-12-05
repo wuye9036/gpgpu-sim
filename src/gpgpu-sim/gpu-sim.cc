@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2021, Tor M. Aamodt, Wilson W.L. Fung, George L. Yuan,
-// Ali Bakhoda, Andrew Turner, Ivan Sham, Vijay Kandiah, Nikos Hardavellas
-// The University of British Columbia, Northwestern University
+// Ali Bakhoda, Andrew Turner, Ivan Sham, Vijay Kandiah, Nikos Hardavellas, 
+// Mahmoud Khairy, Junrui Pan, Timothy G. Rogers
+// The University of British Columbia, Northwestern University, Purdue University
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -79,7 +80,7 @@ class gpgpu_sim_wrapper {};
 #include <sstream>
 #include <string>
 
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+// #define MAX(a, b) (((a) > (b)) ? (a) : (b)) //redefined 
 
 bool g_interactive_debugger_enabled = false;
 
@@ -394,7 +395,7 @@ void shader_core_config::reg_options(class OptionParser *opp) {
                          "gpgpu_ignore_resources_limitation (default 0)", "0");
   option_parser_register(
       opp, "-gpgpu_shader_cta", OPT_UINT32, &max_cta_per_core,
-      "Maximum number of concurrent CTAs in shader (default 8)", "8");
+      "Maximum number of concurrent CTAs in shader (default 32)", "32");
   option_parser_register(
       opp, "-gpgpu_num_cta_barriers", OPT_UINT32, &max_barriers_per_cta,
       "Maximum number of named barriers per CTA (default 16)", "16");
@@ -585,26 +586,26 @@ void shader_core_config::reg_options(class OptionParser *opp) {
       "ID_OC_SP,ID_OC_DP,ID_OC_INT,ID_OC_SFU,ID_OC_MEM,OC_EX_SP,OC_EX_DP,OC_EX_"
       "INT,OC_EX_SFU,OC_EX_MEM,EX_WB,ID_OC_TENSOR_CORE,OC_EX_TENSOR_CORE",
       "1,1,1,1,1,1,1,1,1,1,1,1,1");
-  option_parser_register(opp, "-gpgpu_tensor_core_avail", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_tensor_core_avail", OPT_UINT32,
                          &gpgpu_tensor_core_avail,
                          "Tensor Core Available (default=0)", "0");
-  option_parser_register(opp, "-gpgpu_num_sp_units", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_num_sp_units", OPT_UINT32,
                          &gpgpu_num_sp_units, "Number of SP units (default=1)",
                          "1");
-  option_parser_register(opp, "-gpgpu_num_dp_units", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_num_dp_units", OPT_UINT32,
                          &gpgpu_num_dp_units, "Number of DP units (default=0)",
                          "0");
-  option_parser_register(opp, "-gpgpu_num_int_units", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_num_int_units", OPT_UINT32,
                          &gpgpu_num_int_units,
                          "Number of INT units (default=0)", "0");
-  option_parser_register(opp, "-gpgpu_num_sfu_units", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_num_sfu_units", OPT_UINT32,
                          &gpgpu_num_sfu_units, "Number of SF units (default=1)",
                          "1");
-  option_parser_register(opp, "-gpgpu_num_tensor_core_units", OPT_INT32,
+  option_parser_register(opp, "-gpgpu_num_tensor_core_units", OPT_UINT32,
                          &gpgpu_num_tensor_core_units,
                          "Number of tensor_core units (default=1)", "0");
   option_parser_register(
-      opp, "-gpgpu_num_mem_units", OPT_INT32, &gpgpu_num_mem_units,
+      opp, "-gpgpu_num_mem_units", OPT_UINT32, &gpgpu_num_mem_units,
       "Number if ldst units (default=1) WARNING: not hooked up to anything",
       "1");
   option_parser_register(
@@ -700,7 +701,8 @@ void gpgpu_sim_config::reg_options(option_parser_t opp) {
                          "500.0:2000.0:2000.0:2000.0");
   option_parser_register(
       opp, "-gpgpu_max_concurrent_kernel", OPT_INT32, &max_concurrent_kernel,
-      "maximum kernels that can run concurrently on GPU", "8");
+      "maximum kernels that can run concurrently on GPU, set this value "
+      "according to max resident grids for your compute capability", "32");
   option_parser_register(
       opp, "-gpgpu_cflog_interval", OPT_INT32, &gpgpu_cflog_interval,
       "Interval between each snapshot in control flow logger", "0");
@@ -1638,9 +1640,9 @@ bool shader_core_ctx::occupy_shader_resource_1block(kernel_info_t &k,
 
     SHADER_DPRINTF(LIVENESS,
                    "GPGPU-Sim uArch: Occupied %u threads, %u shared mem, %u "
-                   "registers, %u ctas\n",
+                   "registers, %u ctas, on shader %d\n",
                    m_occupied_n_threads, m_occupied_shmem, m_occupied_regs,
-                   m_occupied_ctas);
+                   m_occupied_ctas, m_sid);
   }
 
   return true;
@@ -1806,9 +1808,9 @@ void shader_core_ctx::issue_block2core(kernel_info_t &kernel) {
   shader_CTA_count_log(m_sid, 1);
   SHADER_DPRINTF(LIVENESS,
                  "GPGPU-Sim uArch: cta:%2u, start_tid:%4u, end_tid:%4u, "
-                 "initialized @(%lld,%lld)\n",
+                 "initialized @(%lld,%lld), kernel_uid:%u, kernel_name:%s\n",
                  free_cta_hw_id, start_thread, end_thread, m_gpu->gpu_sim_cycle,
-                 m_gpu->gpu_tot_sim_cycle);
+                 m_gpu->gpu_tot_sim_cycle, kernel.get_uid(), kernel.get_name().c_str());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -2051,7 +2053,7 @@ void gpgpu_sim::cycle() {
           m_cluster[i]->get_current_occupancy(active, total);
         }
         DPRINTFG(LIVENESS,
-                 "uArch: inst.: %lld (ipc=%4.1f, occ=%0.4f\% [%llu / %llu]) "
+                 "uArch: inst.: %lld (ipc=%4.1f, occ=%0.4f%% [%llu / %llu]) "
                  "sim_rate=%u (inst/sec) elapsed = %u:%u:%02u:%02u / %s",
                  gpu_tot_sim_insn + gpu_sim_insn,
                  (double)gpu_sim_insn / (double)gpu_sim_cycle,

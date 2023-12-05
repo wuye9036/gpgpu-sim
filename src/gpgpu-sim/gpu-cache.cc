@@ -1,5 +1,7 @@
-// Copyright (c) 2009-2021, Tor M. Aamodt, Tayler Hetherington, Vijay Kandiah, Nikos Hardavellas
-// The University of British Columbia, Northwestern University
+// Copyright (c) 2009-2021, Tor M. Aamodt, Tayler Hetherington, 
+// Vijay Kandiah, Nikos Hardavellas, Mahmoud Khairy, Junrui Pan,
+// Timothy G. Rogers
+// The University of British Columbia, Northwestern University, Purdue University
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -407,6 +409,11 @@ void tag_array::fill(new_addr_type addr, unsigned time,
   // assert( m_config.m_alloc_policy == ON_FILL );
   unsigned idx;
   enum cache_request_status status = probe(addr, idx, mask, is_write);
+
+  if (status == RESERVATION_FAIL) {
+	 return;
+  }
+
   bool before = m_lines[idx]->is_modified_line();
   // assert(status==MISS||status==SECTOR_MISS); // MSHR should have prevented
   // redundant memory request
@@ -1373,7 +1380,7 @@ enum cache_request_status data_cache::wr_miss_wa_naive(
       // the evicted block may have wrong chip id when advanced L2 hashing  is
       // used, so set the right chip address from the original mf
       wb->set_chip(mf->get_tlx_addr().chip);
-      wb->set_parition(mf->get_tlx_addr().sub_partition);
+      wb->set_partition(mf->get_tlx_addr().sub_partition);
       send_write_request(wb, cache_event(WRITE_BACK_REQUEST_SENT, evicted),
                          time, events);
     }
@@ -1426,7 +1433,7 @@ enum cache_request_status data_cache::wr_miss_wa_fetch_on_write(
         // the evicted block may have wrong chip id when advanced L2 hashing  is
         // used, so set the right chip address from the original mf
         wb->set_chip(mf->get_tlx_addr().chip);
-        wb->set_parition(mf->get_tlx_addr().sub_partition);
+        wb->set_partition(mf->get_tlx_addr().sub_partition);
         send_write_request(wb, cache_event(WRITE_BACK_REQUEST_SENT, evicted),
                            time, events);
       }
@@ -1499,7 +1506,7 @@ enum cache_request_status data_cache::wr_miss_wa_fetch_on_write(
         // the evicted block may have wrong chip id when advanced L2 hashing  is
         // used, so set the right chip address from the original mf
         wb->set_chip(mf->get_tlx_addr().chip);
-        wb->set_parition(mf->get_tlx_addr().sub_partition);
+        wb->set_partition(mf->get_tlx_addr().sub_partition);
         send_write_request(wb, cache_event(WRITE_BACK_REQUEST_SENT, evicted),
                            time, events);
       }
@@ -1566,7 +1573,7 @@ enum cache_request_status data_cache::wr_miss_wa_lazy_fetch_on_read(
       // the evicted block may have wrong chip id when advanced L2 hashing  is
       // used, so set the right chip address from the original mf
       wb->set_chip(mf->get_tlx_addr().chip);
-      wb->set_parition(mf->get_tlx_addr().sub_partition);
+      wb->set_partition(mf->get_tlx_addr().sub_partition);
       send_write_request(wb, cache_event(WRITE_BACK_REQUEST_SENT, evicted),
                          time, events);
     }
@@ -1648,7 +1655,7 @@ enum cache_request_status data_cache::rd_miss_base(
       // the evicted block may have wrong chip id when advanced L2 hashing  is
       // used, so set the right chip address from the original mf
       wb->set_chip(mf->get_tlx_addr().chip);
-      wb->set_parition(mf->get_tlx_addr().sub_partition);
+      wb->set_partition(mf->get_tlx_addr().sub_partition);
       send_write_request(wb, WRITE_BACK_REQUEST_SENT, time, events);
     }
     return MISS;
