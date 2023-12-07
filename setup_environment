@@ -3,7 +3,7 @@
 ps -p $$ | awk '/bash/ || / sh/ || /zsh/ {exit 1;}' && echo "WARNING ** source setup_environment must be run in a bash, zsh or sh shell; see README"
 
 export GPGPUSIM_SETUP_ENVIRONMENT_WAS_RUN=
-export GPGPUSIM_ROOT="$( cd "$( dirname "$BASH_SOURCE" )" && pwd )"
+export GPGPUSIM_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]:-${(%):-%x}}" )" && pwd )"
 
 GPGPUSIM_VERSION_STRING=`cat $GPGPUSIM_ROOT/version | awk '/Version/ {print $8}'`
 #Detect Git branch and commit #
@@ -44,7 +44,7 @@ if [ $? = 1 ]; then
 	return;
 fi
 
-CC_VERSION=`gcc --version | head -1 | awk '{for(i=1;i<=NF;i++){ if(match($i,/^[0-9]\.[0-9]\.[0-9]$/))  {print $i; exit 0}}}'`
+CC_VERSION=`gcc --version | head -1 | awk '{for(i=1;i<=NF;i++){ if(match($i,/^[0-9]+\.[0-9]\.[0-9]$/))  {print $i; exit 0}}}'`
 
 CUDA_VERSION_STRING=`$CUDA_INSTALL_PATH/bin/nvcc --version | awk '/release/ {print $5;}' | sed 's/,//'`;
 export CUDA_VERSION_NUMBER=`echo $CUDA_VERSION_STRING | sed 's/\./ /' | awk '{printf("%02u%02u", 10*int($1), 10*$2);}'`
